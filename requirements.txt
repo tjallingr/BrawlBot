@@ -1,0 +1,8 @@
+sqlalchemy
+requests
+beautifulsoup4
+lxml
+playwright
+rapidfuzz
+click
+pytest

@@ -1,0 +1,4 @@
+should: 
+
+- store all html data of the scraping. 
+- store in clear manner: per site, per fighter (reconciled+normalized name)
