@@ -12,10 +12,6 @@ def discover_ufc_event_urls(html: str) -> list[str]:
 
 
 def parse_event_odds(html: str) -> list[dict]:
-    """Returns one row per (fighter, sportsbook) with the odds shown on the
-    event page. For a past event this is the final/closing line -- betting
-    is closed by fight time, so there's no separate opening line to recover
-    from this page alone."""
     soup = BeautifulSoup(html, "lxml")
     table = next(t for t in soup.select("table.odds-table") if t.get("class") == ["odds-table"])
 

@@ -31,9 +31,6 @@ def _ctrl_to_seconds(text: str | None) -> int | None:
 
 
 def _iter_round_stats(table, stat_names: list[str]):
-    """Each per-round table has one leading <thead>/<tbody> pair with the
-    real column headers and an empty body, followed by one <tbody> per round
-    (column order is assumed to match that leading header row)."""
     round_tbodies = table.find_all("tbody")[1:]
     for round_num, tbody in enumerate(round_tbodies, start=1):
         cells = tbody.select_one("tr").select("td")

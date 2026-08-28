@@ -25,7 +25,6 @@ def cli():
 @click.option("--limit", type=int, default=None, help="Process at most N new events (for a bounded first run).")
 @click.option("--headless/--headed", default=True)
 def scrape_ufcstats(limit: int | None, headless: bool):
-    """Fetch new UFC events, fights, fighters, and round stats from ufcstats.com."""
     session = get_session(get_engine())
 
     known_event_ids = {row[0] for row in session.execute(select(Event.source_event_id).where(Event.source == "ufcstats"))}

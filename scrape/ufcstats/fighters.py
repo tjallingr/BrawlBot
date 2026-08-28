@@ -3,10 +3,6 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
-# Field layout is the well-documented ufcstats.com fighter-details structure
-# (stable across every public scraper), but -- unlike the event/fight pages --
-# no saved example exists for this one. Verify against a live page first.
-
 
 def _id_from_url(url: str) -> str:
     return url.rstrip("/").rsplit("/", 1)[-1]

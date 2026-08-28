@@ -1,6 +1,3 @@
-"""Maps parsed scrape dicts (see scrape/ufcstats/*.py, scrape/bestfightodds/*.py)
-onto the ORM models in data/storage/models.py."""
-
 from datetime import datetime, timezone
 
 from sqlalchemy import and_, or_, select
@@ -104,11 +101,6 @@ def _find_fight_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -
 
 
 def store_fight_odds(session, odds_rows: list[dict], fighter_candidates: dict[str, int]) -> None:
-    """Groups bestfightodds.com rows by matchup, resolves each fighter name
-    to an existing Fighter via fuzzy matching, and attaches odds to the
-    matching Fight -- purely by fighter pair, with no event-date check yet
-    (two ufcstats fighters normally only share one scraped Fight row, so
-    this is a reasonable first cut, not a guarantee)."""
     now = datetime.now(timezone.utc)
     rows_by_matchup: dict[int, list[dict]] = {}
     for row in odds_rows:

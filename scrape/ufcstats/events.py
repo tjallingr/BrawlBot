@@ -11,14 +11,6 @@ def _id_from_url(url: str) -> str:
 
 
 def discover_event_urls(listing_html: str) -> list[str]:
-    """Parses statistics/events/completed?page=all, which lists every
-    completed event on one page (no real pagination needed).
-
-    Selectors here are based on ufcstats.com's well-documented table markup
-    (unchanged across public scrapers for years) but aren't verified against
-    a saved example page like the event/fight pages are -- check this first
-    if discovery comes back empty.
-    """
     soup = BeautifulSoup(listing_html, "lxml")
     links = soup.select("table.b-statistics__table-events a.b-link")
     return [a["href"] for a in links]
