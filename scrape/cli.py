@@ -1,3 +1,5 @@
+import signal
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 import click
@@ -27,6 +29,7 @@ def cli():
 @click.option("--limit", type=int, default=None, help="Process at most N new events (for a bounded first run).")
 @click.option("--headless/--headed", default=True)
 def scrape_ufcstats(limit: int | None, headless: bool):
+    stop_requested = _stop_on_interrupt()
     session = get_session(get_engine())
 
     known_event_ids = {
@@ -42,6 +45,10 @@ def scrape_ufcstats(limit: int | None, headless: bool):
         new_urls = [url for url in discover_event_urls(listing_html) if id_from_url(url) not in known_event_ids]
 
         for event_url in new_urls[:limit]:
+            if stop_requested():
+                click.echo("stopped at event boundary; rerun to continue")
+                break
+
             click.echo(f"event: {event_url}")
             event_html = fetch(event_url)
             event_data = parse_event_page(event_html, event_url)
@@ -87,6 +94,22 @@ def scrape_bestfightodds(limit: int | None):
 
     session.merge(ScrapeCheckpoint(source="bestfightodds", last_run_at=datetime.now(timezone.utc)))
     session.commit()
+
+
+def _stop_on_interrupt() -> Callable[[], bool]:
+    requested = False
+
+    def handle(signum, frame):
+        nonlocal requested
+        if requested:
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            click.echo("Ctrl+C again to stop immediately, discarding the current event")
+            return
+        requested = True
+        click.echo("finishing the current event, then stopping")
+
+    signal.signal(signal.SIGINT, handle)
+    return lambda: requested
 
 
 def _fighter_ids_in(event_data: dict) -> set[str]:
