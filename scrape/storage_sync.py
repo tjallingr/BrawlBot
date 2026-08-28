@@ -5,6 +5,17 @@ from sqlalchemy import and_, or_, select
 from data.storage.models import Event, Fight, FightOdds, FightRoundStats, Fighter
 from scrape.reconcile.name_match import best_fighter_match, normalize_name
 
+# Parser keys that carry straight through to identically named model columns.
+FIGHT_COLUMNS = (
+    "weight_class", "method", "round", "time",
+    "kd_a", "kd_b", "str_a", "str_b", "td_a", "td_b", "sub_a", "sub_b",
+)
+ROUND_STAT_COLUMNS = (
+    "round", "kd", "sig_str_landed", "sig_str_att", "total_str_landed", "total_str_att",
+    "td_landed", "td_att", "sub_att", "rev", "ctrl_time_sec",
+    "sig_str_head", "sig_str_body", "sig_str_leg", "sig_str_distance", "sig_str_clinch", "sig_str_ground",
+)
+
 
 def store_fighter(session, fighter_data: dict) -> Fighter:
     fighter = Fighter(
@@ -34,59 +45,31 @@ def store_event(session, event_data: dict, fighter_ids: dict[str, int]) -> tuple
     session.add(event)
     session.flush()
 
-    fights = []
-    for fight_data in event_data["fights"]:
-        winner_ufcstats_id = fight_data["winner_ufcstats_id"]
-        fight = Fight(
+    fights = [
+        Fight(
             event_id=event.id,
             ufcstats_id=fight_data["ufcstats_fight_id"],
             fighter_a_id=fighter_ids[fight_data["fighter_a_ufcstats_id"]],
             fighter_b_id=fighter_ids[fight_data["fighter_b_ufcstats_id"]],
-            winner_id=fighter_ids.get(winner_ufcstats_id) if winner_ufcstats_id else None,
-            weight_class=fight_data["weight_class"],
-            method=fight_data["method"],
-            round=fight_data["round"],
-            time=fight_data["time"],
-            kd_a=fight_data["kd_a"],
-            kd_b=fight_data["kd_b"],
-            str_a=fight_data["str_a"],
-            str_b=fight_data["str_b"],
-            td_a=fight_data["td_a"],
-            td_b=fight_data["td_b"],
-            sub_a=fight_data["sub_a"],
-            sub_b=fight_data["sub_b"],
+            winner_id=fighter_ids.get(fight_data["winner_ufcstats_id"]),
+            **{column: fight_data[column] for column in FIGHT_COLUMNS},
         )
-        session.add(fight)
-        fights.append(fight)
+        for fight_data in event_data["fights"]
+    ]
+    session.add_all(fights)
     session.flush()
     return event, fights
 
 
 def store_round_stats(session, fight: Fight, round_stats: list[dict], fighter_ids: dict[str, int]) -> None:
-    for row in round_stats:
-        session.add(
-            FightRoundStats(
-                fight_id=fight.id,
-                fighter_id=fighter_ids[row["fighter_ufcstats_id"]],
-                round=row["round"],
-                kd=row["kd"],
-                sig_str_landed=row["sig_str_landed"],
-                sig_str_att=row["sig_str_att"],
-                total_str_landed=row["total_str_landed"],
-                total_str_att=row["total_str_att"],
-                td_landed=row["td_landed"],
-                td_att=row["td_att"],
-                sub_att=row["sub_att"],
-                rev=row["rev"],
-                ctrl_time_sec=row["ctrl_time_sec"],
-                sig_str_head=row["sig_str_head"],
-                sig_str_body=row["sig_str_body"],
-                sig_str_leg=row["sig_str_leg"],
-                sig_str_distance=row["sig_str_distance"],
-                sig_str_clinch=row["sig_str_clinch"],
-                sig_str_ground=row["sig_str_ground"],
-            )
+    session.add_all(
+        FightRoundStats(
+            fight_id=fight.id,
+            fighter_id=fighter_ids[row["fighter_ufcstats_id"]],
+            **{column: row[column] for column in ROUND_STAT_COLUMNS},
         )
+        for row in round_stats
+    )
 
 
 def _find_fight_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -> Fight | None:
@@ -111,18 +94,16 @@ def store_fight_odds(session, odds_rows: list[dict], fighter_candidates: dict[st
         fighter_ids = {fid for fid in resolved.values() if fid is not None}
         if len(fighter_ids) != 2:
             continue
-        fighter_a_id, fighter_b_id = fighter_ids
-        fight = _find_fight_by_fighter_pair(session, fighter_a_id, fighter_b_id)
+        fight = _find_fight_by_fighter_pair(session, *fighter_ids)
         if not fight:
             continue
-        for row in rows:
-            fighter_id = resolved[row["fighter_name"]]
-            session.add(
-                FightOdds(
-                    fight_id=fight.id,
-                    fighter_id=fighter_id,
-                    sportsbook=row["sportsbook"],
-                    moneyline=row["moneyline"],
-                    scraped_at=now,
-                )
+        session.add_all(
+            FightOdds(
+                fight_id=fight.id,
+                fighter_id=resolved[row["fighter_name"]],
+                sportsbook=row["sportsbook"],
+                moneyline=row["moneyline"],
+                scraped_at=now,
             )
+            for row in rows
+        )

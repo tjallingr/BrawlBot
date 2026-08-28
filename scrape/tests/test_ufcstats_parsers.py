@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from scrape.ufcstats.events import parse_event_page
+from scrape.ufcstats.events import discover_event_urls, parse_event_page
 from scrape.ufcstats.fights import parse_fight_page
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "scrape" / "examples"
@@ -46,3 +46,18 @@ def test_parse_fight_page():
 
     totals_round = {r["fighter_ufcstats_id"]: r for r in fight["round_stats"] if r["round"] == 5}
     assert totals_round["093e1f5bb73850be"]["ctrl_time_sec"] is not None
+
+
+def test_discover_event_urls_skips_upcoming_event():
+    listing = """
+    <table class="b-statistics__table-events"><tbody>
+      <tr class="b-statistics__table-row"><td></td></tr>
+      <tr class="b-statistics__table-row_type_first">
+        <td><a class="b-link" href="http://www.ufcstats.com/event-details/upcoming">Upcoming</a></td>
+      </tr>
+      <tr class="b-statistics__table-row">
+        <td><a class="b-link" href="http://www.ufcstats.com/event-details/completed">Completed</a></td>
+      </tr>
+    </tbody></table>
+    """
+    assert discover_event_urls(listing) == ["http://www.ufcstats.com/event-details/completed"]

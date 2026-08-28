@@ -3,9 +3,7 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
-
-def _id_from_url(url: str) -> str:
-    return url.rstrip("/").rsplit("/", 1)[-1]
+from scrape.urls import id_from_url
 
 
 def _box_item_text(soup: BeautifulSoup, label: str) -> str | None:
@@ -41,7 +39,7 @@ def parse_fighter_page(html: str, url: str) -> dict:
     stance = _box_item_text(soup, "STANCE:")
 
     return {
-        "ufcstats_id": _id_from_url(url),
+        "ufcstats_id": id_from_url(url),
         "name_raw": name,
         "dob": _parse_dob(_box_item_text(soup, "DOB:")),
         "height_cm": _height_to_cm(_box_item_text(soup, "Height:")),

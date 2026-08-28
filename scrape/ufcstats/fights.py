@@ -1,11 +1,9 @@
 from bs4 import BeautifulSoup
 
+from scrape.urls import id_from_url
+
 TOTALS_STATS = ["kd", "sig_str", "sig_str_pct", "total_str", "td", "td_pct", "sub_att", "rev", "ctrl"]
 SIG_STR_STATS = ["sig_str", "sig_str_pct", "head", "body", "leg", "distance", "clinch", "ground"]
-
-
-def _id_from_url(url: str) -> str:
-    return url.rstrip("/").rsplit("/", 1)[-1]
 
 
 def _cell_texts(td) -> list[str]:
@@ -42,7 +40,7 @@ def _iter_round_stats(table, stat_names: list[str]):
 
 def parse_fight_page(html: str, url: str) -> dict:
     soup = BeautifulSoup(html, "lxml")
-    fighter_ids = [_id_from_url(a["href"]) for a in soup.select(".b-fight-details__person-link")]
+    fighter_ids = [id_from_url(a["href"]) for a in soup.select(".b-fight-details__person-link")]
 
     tables = soup.select("table")
     totals_table, sig_str_table = tables[1], tables[3]
@@ -86,7 +84,7 @@ def parse_fight_page(html: str, url: str) -> dict:
     method_value = method_label.find_next_sibling("i") if method_label else None
 
     return {
-        "ufcstats_fight_id": _id_from_url(url),
+        "ufcstats_fight_id": id_from_url(url),
         "is_title_fight": "title" in fight_title.lower(),
         "method_detail": method_value.get_text(strip=True) if method_value else None,
         "round_stats": round_stats,
