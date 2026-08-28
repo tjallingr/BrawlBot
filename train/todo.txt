@@ -1,0 +1,3 @@
+should: 
+
+- train multi-stage model (two models, first one trained on core data that every fighter has, and is then fed to second one)

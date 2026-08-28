@@ -1,0 +1,3 @@
+should:
+
+- take in two names, then run model, then output win probabilities (for now only win/lose, no method)
