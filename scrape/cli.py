@@ -12,7 +12,10 @@ from scrape.bestfightodds.events import discover_ufc_event_urls, parse_event_odd
 from scrape.fetch.browser import browser_session
 from scrape.fetch.http import fetch as http_fetch
 from scrape.fetch.http import make_session
-from scrape.storage_sync import store_event, store_fight_odds, store_fighter, store_round_stats
+from data.storage.repositories.events import store_event
+from data.storage.repositories.fight_odds import store_fight_odds
+from data.storage.repositories.fighters import store_fighter
+from data.storage.repositories.fights import store_round_stats
 from scrape.ufcstats import COMPLETED_EVENTS_URL, fight_url, fighter_url
 from scrape.ufcstats.events import discover_event_urls, parse_event_page
 from scrape.ufcstats.fighters import parse_fighter_page

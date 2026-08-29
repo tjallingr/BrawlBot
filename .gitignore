@@ -6,3 +6,8 @@ data/raw/
 data/db/
 
 examples
+
+
+.pytest_cache
+
+.claude
