@@ -1,0 +1,1 @@
+# loop over all fights and compile training dataset
