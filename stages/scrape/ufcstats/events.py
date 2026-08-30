@@ -2,8 +2,8 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
-from scrape.ufcstats.parsing import to_int
-from scrape.urls import id_from_url
+from stages.scrape.ufcstats.parsing import to_int
+from stages.scrape.urls import id_from_url
 
 UPCOMING_ROW_CLASS = "b-statistics__table-row_type_first"
 

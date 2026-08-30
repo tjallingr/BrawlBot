@@ -3,7 +3,7 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
-from scrape.urls import id_from_url
+from stages.scrape.urls import id_from_url
 
 
 def _box_item_text(soup: BeautifulSoup, label: str) -> str | None:

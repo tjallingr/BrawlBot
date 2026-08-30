@@ -1,5 +1,5 @@
 from data.storage.models import Fighter
-from scrape.reconcile.name_match import normalize_name
+from core.name_match import normalize_name
 
 
 def get_all_fighters():

@@ -8,19 +8,19 @@ from sqlalchemy import select
 from data.storage.db import get_engine, get_session
 from data.storage.models import Event, Fighter, ScrapeCheckpoint
 from data.storage.raw_html import save_raw_html
-from scrape.bestfightodds.events import discover_ufc_event_urls, parse_event_odds
-from scrape.fetch.browser import browser_session
-from scrape.fetch.http import fetch as http_fetch
-from scrape.fetch.http import make_session
+from stages.scrape.bestfightodds.events import discover_ufc_event_urls, parse_event_odds
+from stages.scrape.fetch.browser import browser_session
+from stages.scrape.fetch.http import fetch as http_fetch
+from stages.scrape.fetch.http import make_session
 from data.storage.repositories.events import store_event
 from data.storage.repositories.fight_odds import store_fight_odds
 from data.storage.repositories.fighters import store_fighter
 from data.storage.repositories.fights import store_round_stats
-from scrape.ufcstats import COMPLETED_EVENTS_URL, fight_url, fighter_url
-from scrape.ufcstats.events import discover_event_urls, parse_event_page
-from scrape.ufcstats.fighters import parse_fighter_page
-from scrape.ufcstats.fights import parse_fight_page
-from scrape.urls import id_from_url
+from stages.scrape.ufcstats import COMPLETED_EVENTS_URL, fight_url, fighter_url
+from stages.scrape.ufcstats.events import discover_event_urls, parse_event_page
+from stages.scrape.ufcstats.fighters import parse_fighter_page
+from stages.scrape.ufcstats.fights import parse_fight_page
+from stages.scrape.urls import id_from_url
 
 
 @click.group()

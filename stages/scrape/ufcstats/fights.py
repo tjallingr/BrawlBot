@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 
-from scrape.ufcstats.parsing import to_int
-from scrape.urls import id_from_url
+from stages.scrape.ufcstats.parsing import to_int
+from stages.scrape.urls import id_from_url
 
 TOTALS_STATS = ["kd", "sig_str", "sig_str_pct", "total_str", "td", "td_pct", "sub_att", "rev", "ctrl"]
 SIG_STR_STATS = ["sig_str", "sig_str_pct", "head", "body", "leg", "distance", "clinch", "ground"]

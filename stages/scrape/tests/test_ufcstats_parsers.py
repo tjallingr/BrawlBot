@@ -1,8 +1,8 @@
 from datetime import date
 from pathlib import Path
 
-from scrape.ufcstats.events import discover_event_urls, parse_event_page
-from scrape.ufcstats.fights import parse_fight_page
+from stages.scrape.ufcstats.events import discover_event_urls, parse_event_page
+from stages.scrape.ufcstats.fights import parse_fight_page
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "scrape" / "examples"
 

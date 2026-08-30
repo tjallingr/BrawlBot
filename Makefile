@@ -5,12 +5,12 @@ install:
 	$(PYTHON) -m playwright install chromium
 
 test:
-	$(PYTHON) -m pytest scrape/tests/
+	$(PYTHON) -m pytest
 
 scrape-ufcstats:
-	$(PYTHON) -m scrape.cli ufcstats $(ARGS)
+	$(PYTHON) -m stages.scrape.cli ufcstats $(ARGS)
 
 scrape-odds:
-	$(PYTHON) -m scrape.cli bestfightodds $(ARGS)
+	$(PYTHON) -m stages.scrape.cli bestfightodds $(ARGS)
 
 .PHONY: install test scrape-ufcstats scrape-odds

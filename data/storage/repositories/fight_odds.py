@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from data.storage.models import FightOdds
 from data.storage.repositories.fights import get_fight_by_fighter_pair
-from scrape.reconcile.name_match import best_fighter_match
+from core.name_match import best_fighter_match
 
 
 def store_fight_odds(session, odds_rows: list[dict], fighter_candidates: dict[str, int]) -> None:
