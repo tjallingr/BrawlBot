@@ -6,6 +6,8 @@ from rapidfuzz import fuzz
 
 MATCH_THRESHOLD = 85
 
+# TODO: re-normalize names and backfill them again, accented letters (é etc) get deleted instead of replaced by unaccented one
+
 
 def normalize_name(name: str) -> str:
     name = re.sub(r"[^a-z0-9\s]", "", name.lower())
