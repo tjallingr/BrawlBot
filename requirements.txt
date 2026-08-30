@@ -6,3 +6,6 @@ playwright
 rapidfuzz
 click
 pytest
+pandas
+pyarrow
+scikit-learn

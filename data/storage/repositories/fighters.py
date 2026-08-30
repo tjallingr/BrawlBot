@@ -1,13 +1,11 @@
+from sqlalchemy import select
+
 from data.storage.models import Fighter
 from core.name_match import normalize_name
 
 
-def get_all_fighters():
-    pass
-
-
-def get_fighter_stats(fighter):
-    pass
+def get_all_fighters(session) -> dict[int, Fighter]:
+    return {fighter.id: fighter for fighter in session.execute(select(Fighter)).scalars()}
 
 
 def store_fighter(session, fighter_data: dict) -> Fighter:

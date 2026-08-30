@@ -1,9 +1,11 @@
+from sqlalchemy import select
+
 from data.storage.models import Event, Fight
 from data.storage.repositories import model_kwargs
 
 
-def get_all_events():
-    pass
+def get_all_events(session) -> list[Event]:
+    return list(session.execute(select(Event).order_by(Event.date)).scalars())
 
 
 def store_event(session, event_data: dict, fighter_ids: dict[str, int]) -> tuple[Event, list[Fight]]:
