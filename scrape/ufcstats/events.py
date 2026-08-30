@@ -2,6 +2,7 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
+from scrape.ufcstats.parsing import to_int
 from scrape.urls import id_from_url
 
 UPCOMING_ROW_CLASS = "b-statistics__table-row_type_first"
@@ -28,7 +29,7 @@ def _fight_row_result(row) -> dict:
     flag = cells[0].select_one("a.b-flag")
     won_by_first = flag is not None and "b-flag_style_green" in flag.get("class", [])
 
-    kd, str_, td, sub = [[int(p.get_text(strip=True)) for p in cells[i].select("p")] for i in (2, 3, 4, 5)]
+    kd, str_, td, sub = [[to_int(p.get_text(strip=True)) for p in cells[i].select("p")] for i in (2, 3, 4, 5)]
 
     return {
         "ufcstats_fight_id": id_from_url(row["data-link"]),
@@ -47,7 +48,7 @@ def _fight_row_result(row) -> dict:
         "sub_b": sub[1],
         "weight_class": cells[6].get_text(strip=True),
         "method": cells[7].select_one("p").get_text(strip=True),
-        "round": int(cells[8].get_text(strip=True)),
+        "round": to_int(cells[8].get_text(strip=True)),
         "time": cells[9].get_text(strip=True),
     }
 
