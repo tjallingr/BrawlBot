@@ -13,4 +13,8 @@ scrape-ufcstats:
 scrape-odds:
 	$(PYTHON) -m stages.scrape.cli bestfightodds $(ARGS)
 
+compile-set:
+	$(PYTHON) -m stages.train.cli compile
+
+
 .PHONY: install test scrape-ufcstats scrape-odds

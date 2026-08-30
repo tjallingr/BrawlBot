@@ -1,24 +1,24 @@
 from sqlalchemy import select
 
 from data.storage.models import Fighter
-from core.name_match import normalize_name
 
 
-def get_all_fighters(session) -> dict[int, Fighter]:
-    return {fighter.id: fighter for fighter in session.execute(select(Fighter)).scalars()}
-
-
-def store_fighter(session, fighter_data: dict) -> Fighter:
-    fighter = Fighter(
-        ufcstats_id=fighter_data["ufcstats_id"],
-        name_raw=fighter_data["name_raw"],
-        name_normalized=normalize_name(fighter_data["name_raw"]),
-        dob=fighter_data.get("dob"),
-        height_cm=fighter_data.get("height_cm"),
-        reach_cm=fighter_data.get("reach_cm"),
-        stance=fighter_data.get("stance"),
-        raw_html_path=fighter_data.get("raw_html_path"),
-    )
+def add(session, **fields) -> Fighter:
+    fighter = Fighter(**fields)
     session.add(fighter)
     session.flush()
     return fighter
+
+
+def get_all(session) -> dict[int, Fighter]:
+    return {fighter.id: fighter for fighter in session.execute(select(Fighter)).scalars()}
+
+
+def get_ufcstats_ids(session) -> dict[str, int]:
+    return dict(session.execute(
+        select(Fighter.ufcstats_id, Fighter.id).where(Fighter.ufcstats_id.is_not(None))
+    ).all())
+
+
+def get_normalized_names(session) -> dict[str, int]:
+    return dict(session.execute(select(Fighter.name_normalized, Fighter.id)).all())

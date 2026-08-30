@@ -1,45 +1,28 @@
-from sqlalchemy import and_, func, or_, select
+from datetime import date
 
+from sqlalchemy import and_, or_, select
+
+from data.storage.mapping import column_names, model_kwargs
 from data.storage.models import Event, Fight, FightRoundStats
-from data.storage.repositories import model_kwargs
+
+# Everything FightRoundStats counts per round; summing them describes a whole fight.
+ROUND_STAT_COLUMNS = column_names(FightRoundStats, exclude={"id", "fight_id", "fighter_id", "round"})
 
 
-ROUND_STAT_COLUMNS = tuple(
-    column.name
-    for column in FightRoundStats.__table__.columns
-    if column.name not in {"id", "fight_id", "fighter_id", "round"}
-)
+def add_all(session, rows: list[dict]) -> list[Fight]:
+    fights = [Fight(**model_kwargs(Fight, row)) for row in rows]
+    session.add_all(fights)
+    session.flush()
+    return fights
 
 
-def get_fights_chronological(session) -> list[tuple[Fight, object]]:
-    return session.execute(
-        select(Fight, Event.date)
-        .join(Event, Event.id == Fight.event_id)
-        .where(Fight.winner_id.is_not(None))
-        .order_by(Event.date, Fight.id)
-    ).all()
+def update(session, fight: Fight, **fields) -> Fight:
+    for name, value in fields.items():
+        setattr(fight, name, value)
+    return fight
 
 
-def get_fight_stats(session) -> dict[tuple[int, int], dict[str, int]]:
-    totals = [func.sum(getattr(FightRoundStats, name)).label(name) for name in ROUND_STAT_COLUMNS]
-    rows = session.execute(
-        select(FightRoundStats.fight_id, FightRoundStats.fighter_id, *totals)
-        .group_by(FightRoundStats.fight_id, FightRoundStats.fighter_id)
-    ).all()
-    return {
-        (row.fight_id, row.fighter_id): {name: getattr(row, name) for name in ROUND_STAT_COLUMNS}
-        for row in rows
-    }
-
-
-def get_rounds_per_fight(session) -> dict[int, int]:
-    rows = session.execute(
-        select(FightRoundStats.fight_id, func.max(FightRoundStats.round)).group_by(FightRoundStats.fight_id)
-    ).all()
-    return dict(rows)
-
-
-def get_fight_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -> Fight | None:
+def get_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -> Fight | None:
     return session.execute(
         select(Fight).where(
             or_(
@@ -50,12 +33,16 @@ def get_fight_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -> 
     ).scalars().first()
 
 
-def store_round_stats(session, fight: Fight, round_stats: list[dict], fighter_ids: dict[str, int]) -> None:
-    session.add_all(
-        FightRoundStats(
-            fight_id=fight.id,
-            fighter_id=fighter_ids[row["fighter_ufcstats_id"]],
-            **model_kwargs(FightRoundStats, row),
-        )
-        for row in round_stats
-    )
+def get_all_with_dates(session) -> list[tuple[Fight, date]]:
+    return session.execute(
+        select(Fight, Event.date).join(Event, Event.id == Fight.event_id).order_by(Event.date, Fight.id)
+    ).all()
+
+
+def add_round_stats(session, rows: list[dict]) -> None:
+    """Insert round stats. Keys that are not columns of the table are ignored."""
+    session.add_all(FightRoundStats(**model_kwargs(FightRoundStats, row)) for row in rows)
+
+
+def get_all_round_stats(session) -> list[FightRoundStats]:
+    return list(session.execute(select(FightRoundStats)).scalars())
