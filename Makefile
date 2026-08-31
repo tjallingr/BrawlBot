@@ -16,5 +16,8 @@ scrape-odds:
 compile-set:
 	$(PYTHON) -m stages.train.cli compile
 
+fit:
+	$(PYTHON) -m stages.train.cli fit $(ARGS)
 
-.PHONY: install test scrape-ufcstats scrape-odds
+
+.PHONY: install test scrape-ufcstats scrape-odds compile-set fit
