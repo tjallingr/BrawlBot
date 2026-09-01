@@ -3,8 +3,10 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
@@ -16,7 +18,7 @@ from data.features.dataset import load_dataset
 from stages.train.dataset import split_xy
 
 dataset = load_dataset()
-train, test = train_test_split(dataset, test_size=0.2)
+train, test = train_test_split(dataset, test_size=0.1)
 
 X_train, y_train, _groups = split_xy(train)
 X_test, y_test, _groups_test = split_xy(test)
@@ -51,6 +53,18 @@ def dt():
     y_proba = model.predict_proba(X_test)[:, 1]
     return "decision tree", y_pred, y_proba
 
+def random_forest():
+    model = RandomForestClassifier().fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    return "random forest", y_pred, y_proba
+
+def gb():
+    model = GradientBoostingClassifier().fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    return "gradient boosting", y_pred, y_proba
+
 def perceptron():
     columns = ["d_td_acc", "b_ctrl_time_sec_pr"]
     X_train_2 = X_train[columns]
@@ -78,21 +92,26 @@ def mlp():
 if __name__ == "__main__":
     print("eval on ", len(y_test), " examples")
     results = [
-        # logistic_reg(),
+        logistic_reg(),
         dt(),
         perceptron(),
         nb(),
         mlp(),
+        random_forest(),
+        gb()
     ]
 
     table = []
     for name, y_pred, y_proba in results:
-        print(name)
-        print(confusion_matrix(y_test, y_pred))
+        matrix = confusion_matrix(y_test, y_pred)
+        tn, fp, fn, tp = matrix.ravel().tolist()
+
         table.append({
             "model": name,
-            "accuracy": accuracy_score(y_test, y_pred),
             "auc": roc_auc_score(y_test, y_proba),
+            "accuracy": accuracy_score(y_test, y_pred),
+            "recall": tp / (tp + fn),
+            "precision": tp / (tp + fp),
         })
     print(pd.DataFrame(table))
 
