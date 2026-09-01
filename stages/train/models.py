@@ -1,3 +1,5 @@
+import pandas as pd
+
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
@@ -5,7 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
 
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.impute import SimpleImputer
@@ -38,52 +40,59 @@ X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
 def logistic_reg():
-    print("logistic regressor")
     model = LogisticRegression().fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(accuracy)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    return "logistic regression", y_pred, y_proba
 
 def dt():
-    print("decision tree")
     model = DecisionTreeClassifier().fit(X_train, y_train)
-    y_pred = model.predict_proba(X_test)
-    accuracy = roc_auc_score(y_test, y_pred)
-    print(accuracy)
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    return "decision tree", y_pred, y_proba
 
 def perceptron():
-    print("perceptron")
     columns = ["d_td_acc", "b_ctrl_time_sec_pr"]
     X_train_2 = X_train[columns]
-    X_test_2 = X_test[columns]  
+    X_test_2 = X_test[columns]
     model = MLPClassifier().fit(X_train_2, y_train)
     y_pred = model.predict(X_test_2)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(accuracy)
+    y_proba = model.predict_proba(X_test_2)[:, 1]
+    return "perceptron", y_pred, y_proba
 
 def nb():
-    print("naive bayes")
     model = GaussianNB().fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(accuracy)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    return "naive bayes", y_pred, y_proba
 
 def mlp():
-    print("mlp")
     columns = [col for col in X_train if col.startswith("d")]
-    print(columns)
     X_train_2 = X_train[columns]
-    X_test_2 = X_test[columns]  
+    X_test_2 = X_test[columns]
     model = MLPClassifier(hidden_layer_sizes=(100,1000,100)).fit(X_train_2, y_train)
     y_pred = model.predict(X_test_2)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(accuracy)
+    y_proba = model.predict_proba(X_test_2)[:, 1]
+    return "mlp", y_pred, y_proba
 
 if __name__ == "__main__":
-    print("accuracy eval on ", len(y_test), " examples")
-    # logistic_reg()
-    dt()
-    perceptron()
-    nb()
-    mlp()
+    print("eval on ", len(y_test), " examples")
+    results = [
+        # logistic_reg(),
+        dt(),
+        perceptron(),
+        nb(),
+        mlp(),
+    ]
+
+    table = []
+    for name, y_pred, y_proba in results:
+        print(name)
+        print(confusion_matrix(y_test, y_pred))
+        table.append({
+            "model": name,
+            "accuracy": accuracy_score(y_test, y_pred),
+            "auc": roc_auc_score(y_test, y_proba),
+        })
+    print(pd.DataFrame(table))
 
