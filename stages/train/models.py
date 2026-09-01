@@ -11,7 +11,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
 
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 
 from data.features.dataset import load_dataset
@@ -22,6 +22,13 @@ train, test = train_test_split(dataset, test_size=0.1)
 
 X_train, y_train, _groups = split_xy(train)
 X_test, y_test, _groups_test = split_xy(test)
+
+#encoding categorical features
+encoder = OneHotEncoder(sparse_output=False).set_output(transform="pandas")
+train_encoded = encoder.fit_transform(X_train[["weight_class"]])
+test_encoded = encoder.transform(X_test[["weight_class"]])
+X_train = pd.concat([X_train.drop(columns="weight_class"), train_encoded], axis=1)
+X_test = pd.concat([X_test.drop(columns="weight_class"), test_encoded], axis=1)
 
 # imputing NaNs
 # fit on training data, reuse it on test

@@ -6,7 +6,7 @@ from data.features.dataset import DEFAULT_DATASET_PATH, load_dataset
 
 TARGET_COLUMN = "red_won"
 GROUP_COLUMN = "fight_id"
-NON_FEATURE_COLUMNS = (GROUP_COLUMN, "date", "weight_class", TARGET_COLUMN)
+NON_FEATURE_COLUMNS = (GROUP_COLUMN, "date", TARGET_COLUMN)
 
 
 def split_xy(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
