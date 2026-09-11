@@ -13,6 +13,7 @@ examples
 .claude
 data/sets/
 
+/models
 
 feature_scores.txt
 forward_selection.txt

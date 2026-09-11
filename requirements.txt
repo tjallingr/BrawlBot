@@ -9,3 +9,4 @@ pytest
 pandas
 pyarrow
 scikit-learn
+joblib
