@@ -1,74 +1,63 @@
 from datetime import date
-from itertools import combinations
 import pandas as pd
 from data.features.dataset import load_dataset
 
 from stages.train.dataset import split_xy
+from stages.train.pipeline import RANDOM_STATE, build_preprocessing_pipeline, time_group_splits
 
 from sklearn.tree import DecisionTreeClassifier
 
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score
 
 
 df = load_dataset()
 
 # first cut off the first 3 ish years: different sports format, not that applicable on current 5min round system
-df = df[df["date"] >= date(1999, 7, 16)]
+df = df[df["date"] >= date(1999, 7, 16)].reset_index(drop=True)
 
-# 80 5 15 split
-frac_train = int((0.85*len(df)))
-frac_val = int((0.05*len(df)))
-train = df.iloc[:frac_train]
-val = df.iloc[frac_train:frac_train+frac_val]
-test = df.iloc[frac_train+frac_val:]
+X, y, _ = split_xy(df)
 
-X_train, y_train, _ = split_xy(train)
-X_val, y_val, _ = split_xy(val)
-X_test, y_test, _ = split_xy(test)
+# fixed column list so every fold has the same columns to select by name:
+# an early fold's train window has not seen every weight class yet (eg the
+# women's divisions only start in 2013), so its own one-hot output would
+# otherwise be missing those columns entirely rather than zero-filled
+ALL_COLUMNS = build_preprocessing_pipeline().fit_transform(X).columns
 
-# encode
-encoder = OneHotEncoder(sparse_output=False).set_output(transform="pandas")
-train_encoded = encoder.fit_transform(X_train[["weight_class"]])
-val_encoded = encoder.transform(X_val[["weight_class"]])
-test_encoded = encoder.transform(X_test[["weight_class"]])
+folds = []
+for train_idx, test_idx in time_group_splits(df, n_splits=5):
+    X_train_raw, X_test_raw = X.loc[train_idx], X.loc[test_idx]
+    y_train, y_test = y.loc[train_idx], y.loc[test_idx]
 
-X_train = pd.concat([X_train.drop(columns="weight_class"), train_encoded], axis=1)
-X_test = pd.concat([X_test.drop(columns="weight_class"), test_encoded], axis=1)
-X_val = pd.concat([X_val.drop(columns="weight_class"), val_encoded], axis=1)
+    pipeline = build_preprocessing_pipeline()
+    X_train = pipeline.fit_transform(X_train_raw).reindex(columns=ALL_COLUMNS, fill_value=0)
+    X_test = pipeline.transform(X_test_raw).reindex(columns=ALL_COLUMNS, fill_value=0)
 
-# impute
-imputer = SimpleImputer(strategy="median").set_output(transform="pandas")
-X_train = imputer.fit_transform(X_train)
-X_test = imputer.transform(X_test)
-X_val = imputer.transform(X_val)
+    folds.append((X_train, y_train, X_test, y_test))
 
-# scale (not really necessary for dt)
-scaler = StandardScaler().set_output(transform="pandas")
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-X_val = scaler.transform(X_val)
+dt = DecisionTreeClassifier(random_state=RANDOM_STATE)
 
-dt = DecisionTreeClassifier()
-
-def test_features():
-    table = []
-    for feature in X_train.columns:
-        dt.fit(X_train[[feature]], y_train)
-        y_pred = dt.predict(X_test[[feature]])
-        y_proba = dt.predict_proba(X_test[[feature]])[:, 1]
+def score_columns(columns):
+    rows = []
+    for X_train, y_train, X_test, y_test in folds:
+        dt.fit(X_train[columns], y_train)
+        y_pred = dt.predict(X_test[columns])
+        y_proba = dt.predict_proba(X_test[columns])[:, 1]
 
         matrix = confusion_matrix(y_test, y_pred)
         tn, fp, fn, tp = matrix.ravel().tolist()
 
-        table.append({
-            "feature": feature,
+        rows.append({
             "auc": roc_auc_score(y_test, y_proba),
             "accuracy": accuracy_score(y_test, y_pred),
             "recall": tp / (tp + fn),
-            "precision": tp / (tp + fp),
+            "precision": tp / (tp + fp) if (tp + fp) else 0.0,
         })
+    return pd.DataFrame(rows).mean().to_dict()
+
+def test_features():
+    table = []
+    for feature in ALL_COLUMNS:
+        table.append({"feature": feature, **score_columns([feature])})
     return pd.DataFrame(table).sort_values("auc", ascending=False)
 
 
@@ -77,31 +66,18 @@ def forward_select(max_features=None):
     greedy forward selection
     """
     chosen = []
-    remaining = list(X_train.columns)
+    remaining = list(ALL_COLUMNS)
     table = []
 
     while remaining and (max_features is None or len(chosen) < max_features):
         best_feature, best_row = None, None
         for feature in remaining:
             cols = chosen + [feature]
-            dt.fit(X_train[cols], y_train)
-            y_pred = dt.predict(X_test[cols])
-            y_proba = dt.predict_proba(X_test[cols])[:, 1]
+            scores = score_columns(cols)
 
-            matrix = confusion_matrix(y_test, y_pred)
-            tn, fp, fn, tp = matrix.ravel().tolist()
-            auc = roc_auc_score(y_test, y_proba)
-
-            if best_row is None or auc > best_row["auc"]:
+            if best_row is None or scores["auc"] > best_row["auc"]:
                 best_feature = feature
-                best_row = {
-                    "n_features": len(cols),
-                    "added": feature,
-                    "auc": auc,
-                    "accuracy": accuracy_score(y_test, y_pred),
-                    "recall": tp / (tp + fn),
-                    "precision": tp / (tp + fp),
-                }
+                best_row = {"n_features": len(cols), "added": feature, **scores}
 
         chosen.append(best_feature)
         remaining.remove(best_feature)
@@ -110,37 +86,9 @@ def forward_select(max_features=None):
     return chosen, pd.DataFrame(table)
 
 
-def triplet_bruteforce():
-    """Brute force every 3-feature combination. C(76, 3) = 70,300 fits --
-    at ~69ms/fit (measured from forward_select's own run) that's roughly 80
-    minutes. Feasible for size 3 only; size 4 would already be ~24 hours."""
-    table = []
-    for f1, f2, f3 in combinations(X_train.columns, 3):
-        cols = [f1, f2, f3]
-        dt.fit(X_train[cols], y_train)
-        y_pred = dt.predict(X_test[cols])
-        y_proba = dt.predict_proba(X_test[cols])[:, 1]
-
-        matrix = confusion_matrix(y_test, y_pred)
-        tn, fp, fn, tp = matrix.ravel().tolist()
-
-        table.append({
-            "feature_1": f1,
-            "feature_2": f2,
-            "feature_3": f3,
-            "auc": roc_auc_score(y_test, y_proba),
-            "accuracy": accuracy_score(y_test, y_pred),
-            "recall": tp / (tp + fn),
-            "precision": tp / (tp + fp),
-        })
-    return pd.DataFrame(table).sort_values("auc", ascending=False)
-
-
 if __name__ == "__main__":
     test_features().to_csv("stages/train/feature_scores.txt", index=False)
 
     chosen, history = forward_select()
     history.to_csv("stages/train/forward_selection.txt", index=False)
     print("forward selection order:", chosen)
-
-    # triplet_bruteforce().to_csv("stages/train/triplet_scores.txt", index=False)
