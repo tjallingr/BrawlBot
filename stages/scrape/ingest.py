@@ -69,8 +69,11 @@ def store_fight_details(session, fight, fight_details: dict, raw_html_path: str,
     )
 
 
-def store_fight_odds(session, odds_rows: list[dict], fighter_candidates: dict[str, int]) -> None:
+def store_fight_odds(
+    session, odds_rows: list[dict], fighter_candidates: dict[str, int], date_hint: tuple[int, int] | None = None
+) -> None:
     now = datetime.now(timezone.utc)
+    month, day = date_hint if date_hint else (None, None)
     rows_by_matchup: dict[int, list[dict]] = {}
     for row in odds_rows:
         rows_by_matchup.setdefault(row["matchup_id"], []).append(row)
@@ -81,7 +84,7 @@ def store_fight_odds(session, odds_rows: list[dict], fighter_candidates: dict[st
         fighter_ids = {fid for fid in resolved.values() if fid is not None}
         if len(fighter_ids) != 2:
             continue
-        fight = fight_repo.get_by_fighter_pair(session, *fighter_ids)
+        fight = fight_repo.get_by_fighter_pair(session, *fighter_ids, month=month, day=day)
         if not fight:
             continue
         odds_repo.add_all(

@@ -93,8 +93,17 @@ if __name__ == "__main__":
     metrics = evaluate_on_holdout(pipeline, model, features)
     print(f"holdout AUC {metrics['auc']:.4f}  accuracy {metrics['accuracy']:.4f}  brier {metrics['brier']:.4f}")
 
+    # after checking peerformance on holdout, if valid, train on everything
+    X_all, y_all, _ = split_xy(df)
+    final_pipeline = build_preprocessing_pipeline()
+    X_all_transformed = final_pipeline.fit_transform(X_all)
+    final_model = RandomForestClassifier(random_state=RANDOM_STATE, **params).fit(X_all_transformed[features], y_all)
+
     MODELS_DIR.mkdir(exist_ok=True)
-    joblib.dump({"pipeline": pipeline, "model": model, "features": features}, MODELS_DIR / "random_forest_v1.joblib")
+    joblib.dump(
+        {"pipeline": final_pipeline, "model": final_model, "features": features},
+        MODELS_DIR / "random_forest_v1.joblib",
+    )
 
     git_commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     metadata = {
@@ -102,6 +111,7 @@ if __name__ == "__main__":
         "git_commit": git_commit,
         "dev_rows": len(dev_df),
         "holdout_rows": len(holdout_df),
+        "shipped_model_rows": len(df),
         "features": features,
         "params": params,
         "dev_cv_auc": dev_auc,

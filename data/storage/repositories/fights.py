@@ -22,15 +22,28 @@ def update(session, fight: Fight, **fields) -> Fight:
     return fight
 
 
-def get_by_fighter_pair(session, fighter_a_id: int, fighter_b_id: int) -> Fight | None:
-    return session.execute(
-        select(Fight).where(
+def get_by_fighter_pair(
+    session, fighter_a_id: int, fighter_b_id: int, month: int | None = None, day: int | None = None
+) -> Fight | None:
+    # two fighters can meet more than once (trilogies aren't rare in MMA), so
+    candidates = session.execute(
+        select(Fight, Event.date)
+        .join(Event, Event.id == Fight.event_id)
+        .where(
             or_(
                 and_(Fight.fighter_a_id == fighter_a_id, Fight.fighter_b_id == fighter_b_id),
                 and_(Fight.fighter_a_id == fighter_b_id, Fight.fighter_b_id == fighter_a_id),
             )
         )
-    ).scalars().first()
+    ).all()
+    if not candidates:
+        return None
+    if month is None or day is None:
+        return candidates[0][0]
+    for fight, event_date in candidates:
+        if event_date.month == month and event_date.day == day:
+            return fight
+    return None
 
 
 def get_all_with_dates(session) -> list[tuple[Fight, date]]:

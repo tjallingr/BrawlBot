@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 import click
 
 from data.storage.db import get_engine, get_session
-from data.storage.raw_html import save_raw_html
+from data.storage.raw_html import raw_html_exists, save_raw_html
 from data.storage.repositories import checkpoints as checkpoint_repo
 from data.storage.repositories import events as event_repo
 from data.storage.repositories import fighters as fighter_repo
-from stages.scrape.bestfightodds.events import discover_ufc_event_urls, parse_event_odds
+from stages.scrape.bestfightodds.events import SITEMAP_URL, discover_ufc_event_urls, parse_event_date_hint, parse_event_odds
 from stages.scrape.fetch.browser import browser_session
 from stages.scrape.fetch.http import fetch as http_fetch
 from stages.scrape.fetch.http import make_session
@@ -74,17 +74,26 @@ def scrape_ufcstats(limit: int | None, headless: bool):
 @cli.command("bestfightodds")
 @click.option("--limit", type=int, default=None, help="Process at most N event pages.")
 def scrape_bestfightodds(limit: int | None):
+    stop_requested = _stop_on_interrupt()
     session = get_session(get_engine())
     http_session = make_session()
 
-    home_html = http_fetch(http_session, "https://www.bestfightodds.com/")
+    sitemap_xml = http_fetch(http_session, SITEMAP_URL)
     fighter_candidates = fighter_repo.get_normalized_names(session)
 
-    for event_url in discover_ufc_event_urls(home_html)[:limit]:
+    event_urls = discover_ufc_event_urls(sitemap_xml)
+    new_urls = [url for url in event_urls if not raw_html_exists("bestfightodds", "events", id_from_url(url))]
+
+    for event_url in new_urls[:limit]:
+        if stop_requested():
+            click.echo("stopped at event boundary; rerun to continue")
+            break
+
         click.echo(f"odds event: {event_url}")
         html = http_fetch(http_session, event_url)
         save_raw_html("bestfightodds", "events", id_from_url(event_url), html)
-        store_fight_odds(session, parse_event_odds(html), fighter_candidates)
+        store_fight_odds(session, parse_event_odds(html), fighter_candidates, date_hint=parse_event_date_hint(html))
+        session.commit()
 
     checkpoint_repo.mark_run(session, "bestfightodds", datetime.now(timezone.utc))
     session.commit()

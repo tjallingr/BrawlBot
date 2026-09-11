@@ -9,3 +9,7 @@ def save_raw_html(source: str, kind: str, source_id: str, html: str) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
     return str(path)
+
+
+def raw_html_exists(source: str, kind: str, source_id: str) -> bool:
+    return (RAW_DIR / source / kind / f"{source_id}.html").exists()
