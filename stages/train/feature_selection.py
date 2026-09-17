@@ -23,6 +23,16 @@ X, y, _ = split_xy(df)
 # otherwise be missing those columns entirely rather than zero-filled
 ALL_COLUMNS = build_preprocessing_pipeline().fit_transform(X).columns
 
+BASE_NAMES = [
+    "slpm", "sapm", "power_ratio", "td_def", "td_acc", "td_edge", "striking_edge",
+    "age_years", "reach_cm", "is_orthodox", "is_southpaw", "is_switch",
+    "win_rate", "days_since_last", "sig_str_acc",
+]
+COLUMNS = [
+    c for c in ALL_COLUMNS
+    if c.removeprefix("r_").removeprefix("b_").removeprefix("d_") in BASE_NAMES or c.startswith("weight_class_")
+]
+
 folds = []
 for train_idx, test_idx in time_group_splits(df, n_splits=5):
     X_train_raw, X_test_raw = X.loc[train_idx], X.loc[test_idx]
