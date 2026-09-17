@@ -1,11 +1,13 @@
 from collections import defaultdict
 from pathlib import Path
+from statistics import median
 
 import pandas as pd
 
 from data.features.fight import matchup_features
 from data.features.fighter import FighterHistory, fighter_features
 from data.features.fighter import ROUND_STAT_COLUMNS
+from data.storage.repositories import fight_odds as odds_repo
 from data.storage.repositories import fighters as fighter_repo
 from data.storage.repositories import fights as fight_repo
 
@@ -20,6 +22,7 @@ def compile_dataset(session, min_fights: int = 0) -> pd.DataFrame:
     """
     fighters = fighter_repo.get_all(session)
     stats_by_fight_fighter, rounds_by_fight = _summarise_round_stats(fight_repo.get_all_round_stats(session))
+    odds_by_fight_fighter = _summarise_odds(odds_repo.get_all(session))
     histories: dict[int, FighterHistory] = defaultdict(FighterHistory)
 
     rows = []
@@ -32,6 +35,8 @@ def compile_dataset(session, min_fights: int = 0) -> pd.DataFrame:
         if min(a_history.fights, b_history.fights) >= min_fights:
             a_features = fighter_features(a_history, fighters.get(a_id), fight_date)
             b_features = fighter_features(b_history, fighters.get(b_id), fight_date)
+            a_features["odds_prob"] = odds_by_fight_fighter.get((fight.id, a_id))
+            b_features["odds_prob"] = odds_by_fight_fighter.get((fight.id, b_id))
             a_won = fight.winner_id == a_id
             for red, blue, won in ((a_features, b_features, a_won), (b_features, a_features, not a_won)):
                 rows.append(
@@ -52,6 +57,19 @@ def compile_dataset(session, min_fights: int = 0) -> pd.DataFrame:
         b_history.record(fight_date, fight.winner_id == b_id, fight.method, rounds, minutes, b_stats, a_stats)
 
     return pd.DataFrame(rows)
+
+
+def _implied_probability(moneyline: float) -> float:
+    if moneyline > 0:
+        return 100 / (moneyline + 100)
+    return -moneyline / (-moneyline + 100)
+
+
+def _summarise_odds(odds_rows) -> dict[tuple[int, int], float]:
+    moneylines: dict[tuple[int, int], list[float]] = defaultdict(list)
+    for row in odds_rows:
+        moneylines[(row.fight_id, row.fighter_id)].append(row.moneyline)
+    return {key: _implied_probability(median(values)) for key, values in moneylines.items()}
 
 
 def _fight_minutes(fight, rounds: int) -> float:

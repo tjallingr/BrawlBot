@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
 
 from data.storage.models import FightOdds
@@ -12,3 +13,7 @@ def add_all(session, rows: list[dict]) -> None:
         set_={"moneyline": stmt.excluded.moneyline, "scraped_at": stmt.excluded.scraped_at},
     )
     session.execute(stmt, rows)
+
+
+def get_all(session) -> list[FightOdds]:
+    return list(session.execute(select(FightOdds)).scalars())

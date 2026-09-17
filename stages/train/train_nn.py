@@ -1,6 +1,6 @@
 import json
 import subprocess
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -9,9 +9,8 @@ from tensorflow import keras
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import accuracy_score, brier_score_loss, confusion_matrix, roc_auc_score
 
-from data.features.dataset import load_dataset
 from stages.train.dataset import split_xy
-from stages.train.pipeline import RANDOM_STATE, build_preprocessing_pipeline, time_group_splits
+from stages.train.pipeline import RANDOM_STATE, build_preprocessing_pipeline, load_dev_holdout, time_group_splits
 
 MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 EPOCHS = 200
@@ -20,27 +19,8 @@ CANDIDATE_PARAMS = [
     {"hidden": (64, 32), "lr": 1e-3},
     {"hidden": (32, 16), "lr": 5e-4},
 ]
-BASE_NAMES = [
-    "slpm", "sapm", "power_ratio", "td_def", "td_acc", "td_edge", "striking_edge",
-    "age_years", "reach_cm", "is_orthodox", "is_southpaw", "is_switch",
-    "win_rate", "days_since_last", "sig_str_acc",
-]
 
-df = load_dataset()
-df = df[df["date"] >= date(1999, 7, 16)].reset_index(drop=True)
-
-cut = int(len(df) * 0.85)
-dev_df = df.iloc[:cut].reset_index(drop=True)
-holdout_df = df.iloc[cut:]
-
-X_dev, y_dev, _ = split_xy(dev_df)
-X_holdout, y_holdout, _ = split_xy(holdout_df)
-
-ALL_COLUMNS = build_preprocessing_pipeline().fit_transform(X_dev).columns
-COLUMNS = [
-    c for c in ALL_COLUMNS
-    if c.removeprefix("r_").removeprefix("b_").removeprefix("d_") in BASE_NAMES or c.startswith("weight_class_")
-]
+df, dev_df, holdout_df, X_dev, y_dev, X_holdout, y_holdout, ALL_COLUMNS, COLUMNS = load_dev_holdout()
 
 
 def _fit(X_train, y_train, hidden, lr, epochs=EPOCHS):
