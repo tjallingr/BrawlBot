@@ -26,7 +26,7 @@ def build_preprocessing_pipeline():
     )
     return Pipeline([
         ("encode", encode),          # encoding categorical features
-        ("impute", SimpleImputer(strategy="median")),  # imputing NaNs, fit on training data, reuse it on test
+        ("impute", SimpleImputer(strategy="median", add_indicator=True)),  # imputing NaNs, fit on training data, reuse it on test
         ("scale", StandardScaler()),  # scaling features: mean of 0, sd of 1, again fit on training data, reuse on test
     ]).set_output(transform="pandas")
 
@@ -50,10 +50,10 @@ def time_group_splits(frame, n_splits=5, group_col="fight_id", date_col="date"):
 
 
 def select_columns(all_columns, base_names=BASE_NAMES):
-    return [
-        c for c in all_columns
-        if c.removeprefix("r_").removeprefix("b_").removeprefix("d_") in base_names or c.startswith("weight_class_")
-    ]
+    def base_name(c):
+        return c.removeprefix("missingindicator_").removeprefix("r_").removeprefix("b_").removeprefix("d_")
+
+    return [c for c in all_columns if base_name(c) in base_names or c.startswith("weight_class_")]
 
 
 def load_dev_holdout(cutoff=date(1999, 7, 16), dev_frac=0.85):

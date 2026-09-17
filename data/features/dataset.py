@@ -59,6 +59,23 @@ def compile_dataset(session, min_fights: int = 0) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_fighter_histories(session) -> dict[int, FighterHistory]:
+    """replays every recorded fight to get each fighter's history as of today"""
+    stats_by_fight_fighter, rounds_by_fight = _summarise_round_stats(fight_repo.get_all_round_stats(session))
+    histories: dict[int, FighterHistory] = defaultdict(FighterHistory)
+    for fight, fight_date in fight_repo.get_all_with_dates(session):
+        if fight.winner_id is None:
+            continue
+        a_id, b_id = fight.fighter_a_id, fight.fighter_b_id
+        rounds = rounds_by_fight.get(fight.id, fight.round or 0)
+        minutes = _fight_minutes(fight, rounds)
+        a_stats = stats_by_fight_fighter.get((fight.id, a_id))
+        b_stats = stats_by_fight_fighter.get((fight.id, b_id))
+        histories[a_id].record(fight_date, fight.winner_id == a_id, fight.method, rounds, minutes, a_stats, b_stats)
+        histories[b_id].record(fight_date, fight.winner_id == b_id, fight.method, rounds, minutes, b_stats, a_stats)
+    return histories
+
+
 def _implied_probability(moneyline: float) -> float:
     if moneyline > 0:
         return 100 / (moneyline + 100)
