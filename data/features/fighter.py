@@ -14,13 +14,25 @@ class FighterHistory:
     ko_wins: int = 0
     sub_wins: int = 0
     rounds: int = 0
+    minutes: float = 0.0
     last_fight_date: date | None = None
     totals: dict[str, float] = field(default_factory=lambda: dict.fromkeys(ROUND_STAT_COLUMNS, 0.0))
+    allowed: dict[str, float] = field(default_factory=lambda: dict.fromkeys(ROUND_STAT_COLUMNS, 0.0))
 
-    def record(self, fight_date: date, won: bool, method: str | None, rounds: int, stats: dict | None) -> None:
+    def record(
+        self,
+        fight_date: date,
+        won: bool,
+        method: str | None,
+        rounds: int,
+        minutes: float,
+        stats: dict | None,
+        opponent_stats: dict | None,
+    ) -> None:
         self.fights += 1
         self.wins += int(won)
         self.rounds += rounds
+        self.minutes += minutes
         self.last_fight_date = fight_date
         if won and method:
             self.ko_wins += int("KO" in method)
@@ -28,6 +40,9 @@ class FighterHistory:
         for name, value in (stats or {}).items():
             if value is not None:
                 self.totals[name] += value
+        for name, value in (opponent_stats or {}).items():
+            if value is not None:
+                self.allowed[name] += value
 
 
 def fighter_features(history: FighterHistory, fighter, as_of: date) -> dict[str, float | None]:
@@ -35,6 +50,7 @@ def fighter_features(history: FighterHistory, fighter, as_of: date) -> dict[str,
         returns features of a fighter up until given date, no future fights are considered
     """
     per_round = (lambda name: history.totals[name] / history.rounds) if history.rounds else (lambda name: None)
+    per_minute = (lambda totals, name: totals[name] / history.minutes) if history.minutes else (lambda totals, name: None)
 
     features: dict[str, float | None] = {
         "fights": history.fights,
@@ -49,12 +65,22 @@ def fighter_features(history: FighterHistory, fighter, as_of: date) -> dict[str,
         "height_cm": fighter.height_cm if fighter else None,
         "reach_cm": fighter.reach_cm if fighter else None,
         "is_orthodox": float(fighter.stance == "Orthodox") if fighter and fighter.stance else None,
+        "is_southpaw": float(fighter.stance == "Southpaw") if fighter and fighter.stance else None,
+        "is_switch": float(fighter.stance == "Switch") if fighter and fighter.stance else None,
     }
     features |= {f"{name}_pr": per_round(name) for name in RATE_STATS}
     features["sig_str_acc"] = _ratio(history.totals["sig_str_landed"], history.totals["sig_str_att"])
     features["td_acc"] = _ratio(history.totals["td_landed"], history.totals["td_att"])
+    features["td_def"] = _complement_ratio(history.allowed["td_landed"], history.allowed["td_att"])
+    features["slpm"] = per_minute(history.totals, "sig_str_landed")
+    features["sapm"] = per_minute(history.allowed, "sig_str_landed")
+    features["power_ratio"] = _ratio(history.totals["kd"], history.totals["total_str_att"])
     return features
 
 
 def _ratio(numerator: float, denominator: float) -> float | None:
     return numerator / denominator if denominator else None
+
+
+def _complement_ratio(numerator: float, denominator: float) -> float | None:
+    return 1 - numerator / denominator if denominator else None

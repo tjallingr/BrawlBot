@@ -45,12 +45,20 @@ def compile_dataset(session, min_fights: int = 0) -> pd.DataFrame:
                 )
 
         rounds = rounds_by_fight.get(fight.id, fight.round or 0)
-        for fighter_id, won in ((a_id, fight.winner_id == a_id), (b_id, fight.winner_id == b_id)):
-            histories[fighter_id].record(
-                fight_date, won, fight.method, rounds, stats_by_fight_fighter.get((fight.id, fighter_id))
-            )
+        minutes = _fight_minutes(fight, rounds)
+        a_stats = stats_by_fight_fighter.get((fight.id, a_id))
+        b_stats = stats_by_fight_fighter.get((fight.id, b_id))
+        a_history.record(fight_date, fight.winner_id == a_id, fight.method, rounds, minutes, a_stats, b_stats)
+        b_history.record(fight_date, fight.winner_id == b_id, fight.method, rounds, minutes, b_stats, a_stats)
 
     return pd.DataFrame(rows)
+
+
+def _fight_minutes(fight, rounds: int) -> float:
+    if fight.time and ":" in fight.time:
+        minutes, seconds = fight.time.split(":")
+        return (rounds - 1) * 5 + int(minutes) + int(seconds) / 60
+    return rounds * 5.0
 
 
 def _summarise_round_stats(round_stats) -> tuple[dict[tuple[int, int], dict], dict[int, int]]:

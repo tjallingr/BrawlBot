@@ -1,5 +1,6 @@
 import click
 from data.features.dataset import compile_dataset, write_dataset
+from data.storage.db import get_engine, get_session
 
 @click.group()
 def cli():
