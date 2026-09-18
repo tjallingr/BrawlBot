@@ -11,3 +11,4 @@ pyarrow
 scikit-learn
 joblib
 tensorflow-cpu
+gradio
