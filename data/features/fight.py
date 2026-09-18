@@ -8,6 +8,7 @@ def matchup_features(red: dict, blue: dict) -> dict[str, float | None]:
     row |= {
         f"d_{name}": None if red[name] is None or blue[name] is None else red[name] - blue[name]
         for name in red
+        if not isinstance(red[name], str) and not isinstance(blue[name], str)
     }
     row["r_td_edge"] = _edge(red["td_acc"], blue["td_def"])
     row["b_td_edge"] = _edge(blue["td_acc"], red["td_def"])

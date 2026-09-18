@@ -64,9 +64,7 @@ def fighter_features(history: FighterHistory, fighter, as_of: date) -> dict[str,
         "age_years": (as_of - fighter.dob).days / 365.25 if fighter and fighter.dob else None,
         "height_cm": fighter.height_cm if fighter else None,
         "reach_cm": fighter.reach_cm if fighter else None,
-        "is_orthodox": float(fighter.stance == "Orthodox") if fighter and fighter.stance else None,
-        "is_southpaw": float(fighter.stance == "Southpaw") if fighter and fighter.stance else None,
-        "is_switch": float(fighter.stance == "Switch") if fighter and fighter.stance else None,
+        "stance": fighter.stance if fighter else None,
     }
     features |= {f"{name}_pr": per_round(name) for name in RATE_STATS}
     features["sig_str_acc"] = _ratio(history.totals["sig_str_landed"], history.totals["sig_str_att"])

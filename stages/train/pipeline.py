@@ -13,14 +13,16 @@ RANDOM_STATE = 42
 
 BASE_NAMES = [
     "slpm", "sapm", "power_ratio", "td_def", "td_acc", "td_edge", "striking_edge",
-    "age_years", "reach_cm", "is_orthodox", "is_southpaw", "is_switch",
+    "age_years", "reach_cm",
     "win_rate", "days_since_last", "sig_str_acc", "odds_prob",
 ]
+
+ONE_HOT_COLUMNS = ["weight_class", "r_stance", "b_stance"]
 
 
 def build_preprocessing_pipeline():
     encode = ColumnTransformer(
-        [("weight_class", OneHotEncoder(sparse_output=False, handle_unknown="ignore"), ["weight_class"])],
+        [(name, OneHotEncoder(sparse_output=False, handle_unknown="ignore"), [name]) for name in ONE_HOT_COLUMNS],
         remainder="passthrough",
         verbose_feature_names_out=False,
     )
@@ -53,7 +55,7 @@ def select_columns(all_columns, base_names=BASE_NAMES):
     def base_name(c):
         return c.removeprefix("missingindicator_").removeprefix("r_").removeprefix("b_").removeprefix("d_")
 
-    return [c for c in all_columns if base_name(c) in base_names or c.startswith("weight_class_")]
+    return [c for c in all_columns if base_name(c) in base_names or any(c.startswith(f"{name}_") for name in ONE_HOT_COLUMNS)]
 
 
 def load_dev_holdout(cutoff=date(1999, 7, 16), dev_frac=0.85):

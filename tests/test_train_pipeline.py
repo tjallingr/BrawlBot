@@ -12,20 +12,22 @@ def _toy_frame(n_fights=40):
                 "fight_id": i,
                 "date": pd.Timestamp("2000-01-01") + pd.Timedelta(days=i),
                 "weight_class": "Heavyweight" if i % 2 == 0 else "Lightweight",
+                "r_stance": "Orthodox" if i % 3 == 0 else "Southpaw",
+                "b_stance": "Orthodox" if i % 3 == 1 else "Southpaw",
                 "stat": stat,
             })
     return pd.DataFrame(rows)
 
 
 def test_pipeline_leaves_no_nan_and_keeps_original_column_names():
-    X = _toy_frame()[["weight_class", "stat"]]
+    X = _toy_frame()[["weight_class", "r_stance", "b_stance", "stat"]]
     transformed = build_preprocessing_pipeline().fit_transform(X)
     assert not transformed.isna().any().any()
     assert "stat" in transformed.columns
 
 
 def test_pipeline_transform_on_test_reuses_train_fit_without_error():
-    X = _toy_frame()[["weight_class", "stat"]]
+    X = _toy_frame()[["weight_class", "r_stance", "b_stance", "stat"]]
     train, test = X.iloc[:60], X.iloc[60:]
     pipeline = build_preprocessing_pipeline()
     pipeline.fit(train)
