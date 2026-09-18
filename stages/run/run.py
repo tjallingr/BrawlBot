@@ -6,7 +6,7 @@ import joblib
 import pandas as pd
 
 from core.name_match import best_fighter_match
-from data.features.dataset import build_fighter_histories
+from data.features.dataset import build_fighter_histories, implied_probability
 from data.features.fight import matchup_features
 from data.features.fighter import fighter_features
 from data.storage.db import get_engine, get_session
@@ -20,8 +20,10 @@ DEFAULT_MODEL = MODELS_DIR / "random_forest_v1.joblib"
 @click.argument("fighter_a")
 @click.argument("fighter_b")
 @click.option("--weight-class", default="", help="Weight class of the matchup, e.g. 'Lightweight'.")
+@click.option("--odds-a", type=int, default=None, help="Fighter A's moneyline, e.g. -150 or 130.")
+@click.option("--odds-b", type=int, default=None, help="Fighter B's moneyline, e.g. -150 or 130.")
 @click.option("--model", "model_path", type=click.Path(path_type=Path), default=DEFAULT_MODEL)
-def predict(fighter_a: str, fighter_b: str, weight_class: str, model_path: Path):
+def predict(fighter_a: str, fighter_b: str, weight_class: str, odds_a: int | None, odds_b: int | None, model_path: Path):
     session = get_session(get_engine())
     fighters = fighter_repo.get_all(session)
     names = fighter_repo.get_normalized_names(session)
@@ -35,8 +37,8 @@ def predict(fighter_a: str, fighter_b: str, weight_class: str, model_path: Path)
     today = date.today()
     a_features = fighter_features(histories[a_id], fighters.get(a_id), today)
     b_features = fighter_features(histories[b_id], fighters.get(b_id), today)
-    a_features["odds_prob"] = None
-    b_features["odds_prob"] = None
+    a_features["odds_prob"] = implied_probability(odds_a) if odds_a is not None else None
+    b_features["odds_prob"] = implied_probability(odds_b) if odds_b is not None else None
 
     row = {"weight_class": weight_class, **matchup_features(a_features, b_features)}
     X = pd.DataFrame([row])

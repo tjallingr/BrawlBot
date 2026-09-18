@@ -76,7 +76,7 @@ def build_fighter_histories(session) -> dict[int, FighterHistory]:
     return histories
 
 
-def _implied_probability(moneyline: float) -> float:
+def implied_probability(moneyline: float) -> float:
     if moneyline > 0:
         return 100 / (moneyline + 100)
     return -moneyline / (-moneyline + 100)
@@ -86,7 +86,7 @@ def _summarise_odds(odds_rows) -> dict[tuple[int, int], float]:
     moneylines: dict[tuple[int, int], list[float]] = defaultdict(list)
     for row in odds_rows:
         moneylines[(row.fight_id, row.fighter_id)].append(row.moneyline)
-    return {key: _implied_probability(median(values)) for key, values in moneylines.items()}
+    return {key: implied_probability(median(values)) for key, values in moneylines.items()}
 
 
 def _fight_minutes(fight, rounds: int) -> float:
