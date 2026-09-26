@@ -19,5 +19,8 @@ compile-set:
 fit:
 	$(PYTHON) -m stages.train.cli fit $(ARGS)
 
+weekly:
+	$(PYTHON) -m stages.weekly
 
-.PHONY: install test scrape-ufcstats scrape-odds compile-set fit
+
+.PHONY: install test scrape-ufcstats scrape-odds compile-set fit weekly

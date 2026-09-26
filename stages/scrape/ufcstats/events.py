@@ -18,11 +18,35 @@ def discover_event_urls(listing_html: str) -> list[str]:
     return urls
 
 
+def discover_upcoming_event_url(listing_html: str) -> str | None:
+    soup = BeautifulSoup(listing_html, "lxml")
+    row = soup.select_one(f"table.b-statistics__table-events tbody tr.{UPCOMING_ROW_CLASS}")
+    link = row.select_one("a.b-link") if row else None
+    return link["href"] if link else None
+
+
 def _fight_row_result(row) -> dict:
     cells = row.select("td")
     fighter_links = cells[1].select("a")
     fighter_ids = [id_from_url(a["href"]) for a in fighter_links]
     fighter_names = [a.get_text(strip=True) for a in fighter_links]
+
+    base = {
+        "ufcstats_fight_id": id_from_url(row["data-link"]),
+        "fighter_a_ufcstats_id": fighter_ids[0],
+        "fighter_a_name": fighter_names[0],
+        "fighter_b_ufcstats_id": fighter_ids[1],
+        "fighter_b_name": fighter_names[1],
+        "weight_class": cells[6].get_text(strip=True),
+    }
+
+    if not cells[2].select("p"):  # not fought yet: no stats to read
+        return base | {
+            "winner_ufcstats_id": None,
+            "kd_a": None, "kd_b": None, "str_a": None, "str_b": None,
+            "td_a": None, "td_b": None, "sub_a": None, "sub_b": None,
+            "method": None, "round": None, "time": None,
+        }
 
     # ufcstats lists the winner first and flags the row green; draws and no-contests
     # use another flag style, which leaves the winner unset.
@@ -31,12 +55,7 @@ def _fight_row_result(row) -> dict:
 
     kd, str_, td, sub = [[to_int(p.get_text(strip=True)) for p in cells[i].select("p")] for i in (2, 3, 4, 5)]
 
-    return {
-        "ufcstats_fight_id": id_from_url(row["data-link"]),
-        "fighter_a_ufcstats_id": fighter_ids[0],
-        "fighter_a_name": fighter_names[0],
-        "fighter_b_ufcstats_id": fighter_ids[1],
-        "fighter_b_name": fighter_names[1],
+    return base | {
         "winner_ufcstats_id": fighter_ids[0] if won_by_first else None,
         "kd_a": kd[0],
         "kd_b": kd[1],
@@ -46,7 +65,6 @@ def _fight_row_result(row) -> dict:
         "td_b": td[1],
         "sub_a": sub[0],
         "sub_b": sub[1],
-        "weight_class": cells[6].get_text(strip=True),
         "method": cells[7].select_one("p").get_text(strip=True),
         "round": to_int(cells[8].get_text(strip=True)),
         "time": cells[9].get_text(strip=True),
