@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from statistics import median
 
 import click
@@ -13,6 +15,8 @@ from stages.scrape.fetch.http import fetch as http_fetch
 from stages.scrape.fetch.http import make_session
 from stages.scrape.ufcstats import COMPLETED_EVENTS_URL
 from stages.scrape.ufcstats.events import discover_upcoming_event_url, parse_event_page
+
+PREDICTIONS_PATH = Path(__file__).resolve().parents[1] / "data" / "upcoming_predictions.json"
 
 
 def scrape_upcoming_card() -> list[dict]:
@@ -39,11 +43,12 @@ def fetch_current_odds(fighter_candidates: dict[str, int]) -> dict[int, float]:
     return {fighter_id: median(values) for fighter_id, values in moneylines.items()}
 
 
-def predict_upcoming_card() -> None:
+def predict_upcoming_card() -> list[dict]:
     session = get_session(get_engine())
     names = fighter_repo.get_normalized_names(session)
     moneylines = fetch_current_odds(names)
 
+    results = []
     for fight in scrape_upcoming_card():
         a_id = best_fighter_match(fight["fighter_a_name"], names)
         b_id = best_fighter_match(fight["fighter_b_name"], names)
@@ -56,16 +61,24 @@ def predict_upcoming_card() -> None:
                 moneylines.get(b_id) if b_id else None,
             )
         except ValueError as error:
-            click.echo(f"skipping {fight['fighter_a_name']} vs {fight['fighter_b_name']}: {error}")
+            results.append({"fighter_a": fight["fighter_a_name"], "fighter_b": fight["fighter_b_name"], "error": str(error)})
             continue
-        click.echo(f"{name_a}: {proba_a:.1%}  vs  {name_b}: {proba_b:.1%}")
+        results.append({"fighter_a": name_a, "proba_a": proba_a, "fighter_b": name_b, "proba_b": proba_b})
+
+    PREDICTIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREDICTIONS_PATH.write_text(json.dumps(results, indent=2))
+    return results
 
 
 @click.command()
 def weekly():
     scrape_ufcstats.callback(limit=None, headless=True)
     scrape_bestfightodds.callback(limit=None)
-    predict_upcoming_card()
+    for result in predict_upcoming_card():
+        if "error" in result:
+            click.echo(f"skipping {result['fighter_a']} vs {result['fighter_b']}: {result['error']}")
+        else:
+            click.echo(f"{result['fighter_a']}: {result['proba_a']:.1%}  vs  {result['fighter_b']}: {result['proba_b']:.1%}")
 
 
 if __name__ == "__main__":

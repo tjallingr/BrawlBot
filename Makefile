@@ -22,5 +22,8 @@ fit:
 weekly:
 	$(PYTHON) -m stages.weekly
 
+app:
+	$(PYTHON) -m stages.app
 
-.PHONY: install test scrape-ufcstats scrape-odds compile-set fit weekly
+
+.PHONY: install test scrape-ufcstats scrape-odds compile-set fit weekly app

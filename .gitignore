@@ -12,6 +12,7 @@ examples
 
 .claude
 data/sets/
+data/upcoming_predictions.json
 
 /models
 
