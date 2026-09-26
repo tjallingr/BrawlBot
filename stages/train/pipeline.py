@@ -1,8 +1,10 @@
 from datetime import date
 
 import numpy as np
+from sklearn.calibration import calibration_curve
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score, brier_score_loss, confusion_matrix, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -10,6 +12,12 @@ from data.features.dataset import load_dataset
 from stages.train.dataset import split_xy
 
 RANDOM_STATE = 42
+
+# fights on or after this date are never trained on -- they stay a standing,
+# honest evaluation set (see stages/train/eval.py) instead of being folded
+# into the shipped model. Move it forward occasionally to keep both the model
+# and the eval set fresh.
+TRAINING_CUTOFF = date(2025, 9, 1)
 
 BASE_NAMES = [
     "slpm", "sapm", "power_ratio", "td_def", "td_acc", "td_edge", "striking_edge",
@@ -58,9 +66,25 @@ def select_columns(all_columns, base_names=BASE_NAMES):
     return [c for c in all_columns if base_name(c) in base_names or any(c.startswith(f"{name}_") for name in ONE_HOT_COLUMNS)]
 
 
-def load_dev_holdout(cutoff=date(1999, 7, 16), dev_frac=0.85):
+def compute_metrics(y_true, y_proba) -> dict:
+    y_pred = (y_proba >= 0.5).astype(int)
+    matrix = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = matrix.ravel().tolist()
+    observed, predicted = calibration_curve(y_true, y_proba, n_bins=10)
+
+    return {
+        "auc": roc_auc_score(y_true, y_proba),
+        "accuracy": accuracy_score(y_true, y_pred),
+        "recall": tp / (tp + fn) if (tp + fn) else 0.0,
+        "precision": tp / (tp + fp) if (tp + fp) else 0.0,
+        "brier": brier_score_loss(y_true, y_proba),
+        "calibration": list(zip(predicted.tolist(), observed.tolist())),
+    }
+
+
+def load_dev_holdout(cutoff=date(1999, 7, 16), training_cutoff=TRAINING_CUTOFF, dev_frac=0.85):
     df = load_dataset()
-    df = df[df["date"] >= cutoff].reset_index(drop=True)
+    df = df[(df["date"] >= cutoff) & (df["date"] < training_cutoff)].reset_index(drop=True)
 
     cut = int(len(df) * dev_frac)
     dev_df = df.iloc[:cut].reset_index(drop=True)

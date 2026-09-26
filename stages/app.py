@@ -7,6 +7,8 @@ import json
 import gradio as gr
 
 from stages.run.run import predict_matchup
+from stages.train.eval import evaluate as evaluate_holdout
+from stages.train.pipeline import TRAINING_CUTOFF
 from stages.weekly import PREDICTIONS_PATH, predict_upcoming_card
 
 
@@ -39,6 +41,28 @@ def refresh_card():
 
 
 CARD_COLUMNS = ["Fighter A", "Fighter B", "Win % A", "Win % B", "Note"]
+PREDICTION_COLUMNS = ["Date", "Fighter A", "Fighter B", "Predicted A win %", "Actual winner"]
+
+
+def _metrics_summary(metrics: dict) -> str:
+    return (
+        f"AUC {metrics['auc']:.3f}   "
+        f"Accuracy {metrics['accuracy']:.3f}   "
+        f"Recall {metrics['recall']:.3f}   "
+        f"Precision {metrics['precision']:.3f}   "
+        f"Brier {metrics['brier']:.3f}"
+    )
+
+
+def _calibration_rows(metrics: dict) -> list[list[float]]:
+    return [[round(predicted * 100, 1), round(observed * 100, 1)] for predicted, observed in metrics["calibration"]]
+
+
+def load_eval():
+    metrics, predictions = evaluate_holdout()
+    predictions = predictions.assign(date=predictions["date"].astype(str))
+    return _metrics_summary(metrics), _calibration_rows(metrics), predictions.values.tolist()
+
 
 with gr.Blocks(title="BrawlBot") as demo:
     with gr.Tab("Predict a matchup"):
@@ -58,6 +82,16 @@ with gr.Blocks(title="BrawlBot") as demo:
         table = gr.Dataframe(headers=CARD_COLUMNS, value=load_saved_card)
         refresh = gr.Button("Refresh now (re-scrapes odds, takes ~20s)")
         refresh.click(fn=refresh_card, outputs=table)
+
+    with gr.Tab("Eval (held-out fights)"):
+        gr.Markdown(f"Fights on or after **{TRAINING_CUTOFF}** were excluded from training; this is how the shipped model does on them.")
+        metrics_box = gr.Textbox(label="Metrics", interactive=False)
+        calibration_table = gr.Dataframe(headers=["Predicted win %", "Observed win %"], label="Calibration")
+        predictions_table = gr.Dataframe(headers=PREDICTION_COLUMNS, label="Predictions vs outcomes")
+        refresh_eval = gr.Button("Refresh")
+        eval_outputs = [metrics_box, calibration_table, predictions_table]
+        refresh_eval.click(fn=load_eval, outputs=eval_outputs)
+        demo.load(fn=load_eval, outputs=eval_outputs)
 
 if __name__ == "__main__":
     demo.launch()

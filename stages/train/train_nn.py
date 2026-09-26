@@ -6,11 +6,16 @@ from pathlib import Path
 import joblib
 import tensorflow as tf
 from tensorflow import keras
-from sklearn.calibration import calibration_curve
-from sklearn.metrics import accuracy_score, brier_score_loss, confusion_matrix, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 from stages.train.dataset import split_xy
-from stages.train.pipeline import RANDOM_STATE, build_preprocessing_pipeline, load_dev_holdout, time_group_splits
+from stages.train.pipeline import (
+    RANDOM_STATE,
+    build_preprocessing_pipeline,
+    compute_metrics,
+    load_dev_holdout,
+    time_group_splits,
+)
 
 MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 EPOCHS = 200
@@ -65,20 +70,7 @@ def tune_hyperparameters(features):
 def evaluate_on_holdout(pipeline, model, features):
     X_test = pipeline.transform(X_holdout).reindex(columns=pipeline.fit_transform(X_dev).columns, fill_value=0)
     y_proba = _predict_proba(model, X_test[features])
-    y_pred = (y_proba >= 0.5).astype(int)
-
-    matrix = confusion_matrix(y_holdout, y_pred)
-    tn, fp, fn, tp = matrix.ravel().tolist()
-    observed, predicted = calibration_curve(y_holdout, y_proba, n_bins=10)
-
-    return {
-        "auc": roc_auc_score(y_holdout, y_proba),
-        "accuracy": accuracy_score(y_holdout, y_pred),
-        "recall": tp / (tp + fn),
-        "precision": tp / (tp + fp) if (tp + fp) else 0.0,
-        "brier": brier_score_loss(y_holdout, y_proba),
-        "calibration": list(zip(predicted.tolist(), observed.tolist())),
-    }
+    return compute_metrics(y_holdout, y_proba)
 
 
 if __name__ == "__main__":
