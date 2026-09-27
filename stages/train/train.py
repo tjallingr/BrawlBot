@@ -48,10 +48,13 @@ def tune_hyperparameters(features):
     return best_params, best_auc
 
 
-def evaluate_on_holdout(pipeline, model, features):
-    X_test = pipeline.transform(X_holdout).reindex(columns=pipeline.fit_transform(X_dev).columns, fill_value=0)
-    y_proba = model.predict_proba(X_test[features])[:, 1]
-    return compute_metrics(y_holdout, y_proba)
+def predict_holdout(pipeline, model, features, all_columns):
+    X_test = pipeline.transform(X_holdout).reindex(columns=all_columns, fill_value=0)
+    return model.predict_proba(X_test[features])[:, 1]
+
+
+def build_holdout_report(y_proba):
+    return holdout_df.assign(red_win_proba=y_proba)[["fight_id", "date", "r_odds_prob", "b_odds_prob", "red_won", "red_win_proba"]]
 
 
 if __name__ == "__main__":
@@ -63,7 +66,8 @@ if __name__ == "__main__":
     X_train_full = pipeline.fit_transform(X_dev)
     model = RandomForestClassifier(random_state=RANDOM_STATE, **params).fit(X_train_full[features], y_dev)
 
-    metrics = evaluate_on_holdout(pipeline, model, features)
+    y_proba_holdout = predict_holdout(pipeline, model, features, X_train_full.columns)
+    metrics = compute_metrics(y_holdout, y_proba_holdout)
     print(f"holdout AUC {metrics['auc']:.4f}  accuracy {metrics['accuracy']:.4f}  brier {metrics['brier']:.4f}")
 
     # after checking peerformance on holdout, if valid, train on everything
@@ -77,6 +81,7 @@ if __name__ == "__main__":
         {"pipeline": final_pipeline, "model": final_model, "features": features},
         MODELS_DIR / "random_forest_v1.joblib",
     )
+    build_holdout_report(y_proba_holdout).to_parquet(MODELS_DIR / "random_forest_v1_holdout.parquet", index=False)
 
     git_commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     metadata = {

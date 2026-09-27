@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 from statistics import median
 
@@ -15,6 +17,7 @@ from stages.scrape.fetch.http import fetch as http_fetch
 from stages.scrape.fetch.http import make_session
 from stages.scrape.ufcstats import COMPLETED_EVENTS_URL
 from stages.scrape.ufcstats.events import discover_upcoming_event_url, parse_event_page
+from stages.train.cli import compile_set
 
 PREDICTIONS_PATH = Path(__file__).resolve().parents[1] / "data" / "upcoming_predictions.json"
 
@@ -70,10 +73,16 @@ def predict_upcoming_card() -> list[dict]:
     return results
 
 
+def retrain_model() -> None:
+    subprocess.run([sys.executable, "-m", "stages.train.train"], check=True)
+
+
 @click.command()
 def weekly():
     scrape_ufcstats.callback(limit=None, headless=True)
     scrape_bestfightodds.callback(limit=None)
+    compile_set.callback(min_fights=2)  # keeps data/sets/fights.parquet (what eval.py and train.py read) in sync with the DB
+    retrain_model()  # every run: retrain on everything, refresh the holdout report eval.py reads
     for result in predict_upcoming_card():
         if "error" in result:
             click.echo(f"skipping {result['fighter_a']} vs {result['fighter_b']}: {result['error']}")

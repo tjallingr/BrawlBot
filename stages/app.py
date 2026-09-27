@@ -1,14 +1,10 @@
-"""Gradio dashboard. Sits directly under stages/, not inside stages/run, so it
-can use both stages/run and stages/weekly (see stages/weekly.py's docstring
-for why that's allowed).
-"""
+
 import json
 
 import gradio as gr
 
 from stages.run.run import predict_matchup
-from stages.train.eval import evaluate as evaluate_holdout
-from stages.train.pipeline import TRAINING_CUTOFF
+from stages.train.eval import load_metrics, load_predictions, simulate_betting
 from stages.weekly import PREDICTIONS_PATH, predict_upcoming_card
 
 
@@ -44,13 +40,16 @@ CARD_COLUMNS = ["Fighter A", "Fighter B", "Win % A", "Win % B", "Note"]
 PREDICTION_COLUMNS = ["Date", "Fighter A", "Fighter B", "Predicted A win %", "Actual winner"]
 
 
-def _metrics_summary(metrics: dict) -> str:
+def _metrics_summary(metrics: dict, betting: dict) -> str:
     return (
         f"AUC {metrics['auc']:.3f}   "
         f"Accuracy {metrics['accuracy']:.3f}   "
         f"Recall {metrics['recall']:.3f}   "
         f"Precision {metrics['precision']:.3f}   "
-        f"Brier {metrics['brier']:.3f}"
+        f"Brier {metrics['brier']:.3f}\n"
+        f"Betting ({betting['n_fights_with_odds']} fights had odds) -- "
+        f"flat €{betting['flat_stake']:.0f}/fight on the model's pick: €{betting['flat_profit']:+.2f}   "
+        f"stake-by-edge over the market ({betting['edge_bets_placed']} bets placed): €{betting['edge_profit']:+.2f}"
     )
 
 
@@ -59,9 +58,11 @@ def _calibration_rows(metrics: dict) -> list[list[float]]:
 
 
 def load_eval():
-    metrics, predictions = evaluate_holdout()
-    predictions = predictions.assign(date=predictions["date"].astype(str))
-    return _metrics_summary(metrics), _calibration_rows(metrics), predictions.values.tolist()
+    metrics = load_metrics()
+    predictions = load_predictions()
+    betting = simulate_betting(predictions)
+    display = predictions.drop(columns=["r_odds_prob", "b_odds_prob"]).assign(date=predictions["date"].astype(str))
+    return _metrics_summary(metrics, betting), _calibration_rows(metrics), display.values.tolist()
 
 
 with gr.Blocks(title="BrawlBot") as demo:
@@ -83,9 +84,9 @@ with gr.Blocks(title="BrawlBot") as demo:
         refresh = gr.Button("Refresh now (re-scrapes odds, takes ~20s)")
         refresh.click(fn=refresh_card, outputs=table)
 
-    with gr.Tab("Eval (held-out fights)"):
-        gr.Markdown(f"Fights on or after **{TRAINING_CUTOFF}** were excluded from training; this is how the shipped model does on them.")
-        metrics_box = gr.Textbox(label="Metrics", interactive=False)
+    with gr.Tab("Eval (holdout fights)"):
+        gr.Markdown("Retrained weekly on everything; this is the last honest holdout evaluation (~15% of data) from before that final retrain.")
+        metrics_box = gr.Textbox(label="Metrics", interactive=False, lines=2)
         calibration_table = gr.Dataframe(headers=["Predicted win %", "Observed win %"], label="Calibration")
         predictions_table = gr.Dataframe(headers=PREDICTION_COLUMNS, label="Predictions vs outcomes")
         refresh_eval = gr.Button("Refresh")
