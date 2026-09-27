@@ -40,14 +40,18 @@ def predict_matchup(
     a_features["odds_prob"] = implied_probability(odds_a) if odds_a is not None else None
     b_features["odds_prob"] = implied_probability(odds_b) if odds_b is not None else None
 
-    row = {"weight_class": weight_class, **matchup_features(a_features, b_features)}
-    X = pd.DataFrame([row])
-
     bundle = joblib.load(model_path)
-    X_transformed = bundle["pipeline"].transform(X)
-    proba = bundle["model"].predict_proba(X_transformed[bundle["features"]])[:, 1][0]
 
-    return fighters[a_id].name_raw, proba, fighters[b_id].name_raw, 1 - proba
+    def win_proba(red: dict, blue: dict) -> float:
+        row = {"weight_class": weight_class, **matchup_features(red, blue)}
+        X_transformed = bundle["pipeline"].transform(pd.DataFrame([row]))
+        return bundle["model"].predict_proba(X_transformed[bundle["features"]])[:, 1][0]
+
+    # the model isn't exactly symmetric under swapping red/blue; predicting both
+    # ways and averaging cancels that out instead of hoping the model learned it away
+    proba_a = (win_proba(a_features, b_features) + (1 - win_proba(b_features, a_features))) / 2
+
+    return fighters[a_id].name_raw, proba_a, fighters[b_id].name_raw, 1 - proba_a
 
 
 @click.command()

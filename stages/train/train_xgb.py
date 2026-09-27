@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
+from xgboost import XGBClassifier
 
 from stages.train.dataset import split_xy
 from stages.train.pipeline import (
@@ -19,12 +19,16 @@ from stages.train.pipeline import (
 
 MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 CANDIDATE_PARAMS = [
-    {"n_estimators": 500, "max_depth": 8},
-    {"n_estimators": 800, "max_depth": 8},
-    {"n_estimators": 800, "max_depth": 12},
+    {"n_estimators": 200, "max_depth": 4, "learning_rate": 0.05},
+    {"n_estimators": 400, "max_depth": 4, "learning_rate": 0.03},
+    {"n_estimators": 200, "max_depth": 6, "learning_rate": 0.05},
 ]
 
 df, dev_df, holdout_df, X_dev, y_dev, X_holdout, y_holdout, ALL_COLUMNS, COLUMNS = load_dev_holdout()
+
+
+def _model(**params):
+    return XGBClassifier(random_state=RANDOM_STATE, eval_metric="logloss", **params)
 
 
 def tune_hyperparameters(features):
@@ -40,7 +44,7 @@ def tune_hyperparameters(features):
     for params in CANDIDATE_PARAMS:
         aucs = []
         for X_train, y_train, X_test, y_test in folds:
-            model = RandomForestClassifier(random_state=RANDOM_STATE, **params).fit(X_train, y_train)
+            model = _model(**params).fit(X_train, y_train)
             aucs.append(roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]))
         mean_auc = sum(aucs) / len(aucs)
         if mean_auc > best_auc:
@@ -66,24 +70,23 @@ if __name__ == "__main__":
 
     pipeline = build_preprocessing_pipeline()
     X_train_full = pipeline.fit_transform(X_dev)
-    model = RandomForestClassifier(random_state=RANDOM_STATE, **params).fit(X_train_full[features], y_dev)
+    model = _model(**params).fit(X_train_full[features], y_dev)
 
     y_proba_holdout = predict_holdout(pipeline, model, features, X_train_full.columns)
     metrics = compute_metrics(y_holdout, y_proba_holdout)
     print(f"holdout AUC {metrics['auc']:.4f}  accuracy {metrics['accuracy']:.4f}  brier {metrics['brier']:.4f}")
 
-    # after checking peerformance on holdout, if valid, train on everything
     X_all, y_all, _ = split_xy(df)
     final_pipeline = build_preprocessing_pipeline()
     X_all_transformed = final_pipeline.fit_transform(X_all)
-    final_model = RandomForestClassifier(random_state=RANDOM_STATE, **params).fit(X_all_transformed[features], y_all)
+    final_model = _model(**params).fit(X_all_transformed[features], y_all)
 
     MODELS_DIR.mkdir(exist_ok=True)
     joblib.dump(
         {"pipeline": final_pipeline, "model": final_model, "features": features},
-        MODELS_DIR / "random_forest_v1.joblib",
+        MODELS_DIR / "xgboost_v1.joblib",
     )
-    build_holdout_report(y_proba_holdout).to_parquet(MODELS_DIR / "random_forest_v1_holdout.parquet", index=False)
+    build_holdout_report(y_proba_holdout).to_parquet(MODELS_DIR / "xgboost_v1_holdout.parquet", index=False)
 
     git_commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     metadata = {
@@ -97,4 +100,4 @@ if __name__ == "__main__":
         "dev_cv_auc": dev_auc,
         "holdout_metrics": metrics,
     }
-    (MODELS_DIR / "random_forest_v1.json").write_text(json.dumps(metadata, indent=2))
+    (MODELS_DIR / "xgboost_v1.json").write_text(json.dumps(metadata, indent=2))

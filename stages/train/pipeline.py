@@ -1,6 +1,7 @@
 from datetime import date
 
 import numpy as np
+import pandas as pd
 from sklearn.calibration import calibration_curve
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -60,6 +61,17 @@ def select_columns(all_columns, base_names=BASE_NAMES):
     return [c for c in all_columns if base_name(c) in base_names or any(c.startswith(f"{name}_") for name in ONE_HOT_COLUMNS)]
 
 
+def symmetrize_predictions(fight_ids, raw_proba) -> np.ndarray:
+    frame = pd.DataFrame({"fight_id": np.asarray(fight_ids), "raw": np.asarray(raw_proba)})
+    frame["rank"] = frame.groupby("fight_id").cumcount()
+    row0 = frame.loc[frame["rank"] == 0].set_index("fight_id")["raw"]
+    row1 = frame.loc[frame["rank"] == 1].set_index("fight_id")["raw"]
+    symmetrized_row0 = (row0 + (1 - row1)) / 2
+
+    mapped = frame["fight_id"].map(symmetrized_row0)
+    return mapped.where(frame["rank"] == 0, 1 - mapped).to_numpy()
+
+
 def compute_metrics(y_true, y_proba) -> dict:
     y_pred = (y_proba >= 0.5).astype(int)
     matrix = confusion_matrix(y_true, y_pred)
@@ -80,9 +92,14 @@ def load_dev_holdout(cutoff=date(1999, 7, 16), dev_frac=0.85):
     df = load_dataset()
     df = df[df["date"] >= cutoff].reset_index(drop=True)
 
-    cut = int(len(df) * dev_frac)
-    dev_df = df.iloc[:cut].reset_index(drop=True)
-    holdout_df = df.iloc[cut:]
+    # split by fight_id, not by row position: a fight's two mirrored rows must
+    # land on the same side, or the model trains on the near-exact mirror of
+    # a row it's later "honestly" evaluated on
+    fight_ids = df[["fight_id", "date"]].drop_duplicates(subset="fight_id").sort_values("date")["fight_id"]
+    cut = int(len(fight_ids) * dev_frac)
+    dev_ids = set(fight_ids.iloc[:cut])
+    dev_df = df[df["fight_id"].isin(dev_ids)].reset_index(drop=True)
+    holdout_df = df[~df["fight_id"].isin(dev_ids)].reset_index(drop=True)
 
     X_dev, y_dev, _ = split_xy(dev_df)
     X_holdout, y_holdout, _ = split_xy(holdout_df)
